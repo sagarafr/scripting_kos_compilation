@@ -18,11 +18,13 @@ declare -x MAIN_FOLDER=`pwd`
 # TO MODIFY IF YOU WANT BEGIN
 # 0 = no sudo power needed
 # 1 = sudo power needed
+# NOT USED YET
 declare -ix REGULAR_FOLDER=0
 
 declare -xr DC_CHAIN_INSTALL_FOLDER_NAME="dreamcast_chain"
 declare -xr DC_CHAIN_INSTALL_PATH="$MAIN_FOLDER/$DC_CHAIN_INSTALL_FOLDER_NAME/"
 
+# NOT USED YET
 declare -xr NAME_NEW_BASHRC="new_bashrc"
 declare -xr KOS_FOLDER_NAME="kos"
 declare -xr KOS_PORTS_FOLDER_NAME="kos-ports"
