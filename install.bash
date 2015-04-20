@@ -246,7 +246,7 @@ function replace_submodules_git_to_http
 	fi
 
 	# Replace
-	sed "s/git/http/g" --in-place $1
+	sed "s/git:\/\//http:\/\//g" --in-place $1
 	# Error
 	if [ $? -ne 0 ]; then
 		return -4
@@ -277,7 +277,7 @@ function download_submodules
 				GIT_DOWNLOAD_MODE=1
 				
 				# Replace
-				replace_submodules_git_to_http
+				replace_submodules_git_to_http $1
 				exit_the_script
 
 				# Submodule init cmd
@@ -291,7 +291,7 @@ function download_submodules
 
 		1)
 			# Replace
-			replace_submodules_git_to_http
+			replace_submodules_git_to_http $1
 			# Error
 			exit_the_script
 
@@ -321,8 +321,17 @@ function download_submodules
 function download_dc_chain
 {
 	cd $KOS_DC_CHAIN_FOLDER_NAME
-	chmod u+x download.sh
-	./download.sh --no-deps
+	# chmod u+x download.sh
+
+	# if [ $GIT_DOWNLOAD_MODE -eq 1 ]; then
+	# 	sed "s/ftp:\/\//http:\/\//g" --in-place download.sh
+	# fi
+
+	# ./download.sh --no-deps
+
+	wget -c sourceforge.net/projects/devkitpro/files/sources/newlib/newlib-2.0.0.tar.gz
+	wget -c ftp.gnu.org/gnu/binutils/binutils-2.23.2.tar.bz2
+	wget -c ftp.gnu.org/gnu/gcc/gcc-4.7.3/gcc-4.7.3.tar.bz2
 
 	return 0
 }
@@ -337,6 +346,9 @@ function unpack_dc_chain
 	cd $KOS_DC_CHAIN_FOLDER_NAME
 	chmod u+x unpack.sh
 	./unpack.sh --no-deps
+	# tar jxf binutils-2.23.2.tar.bz2
+	# tar jxf gcc-4.7.3.tar.bz2
+	# tar zxf newlib-2.2.0.tar.gz
 
 	return 0
 }
@@ -363,7 +375,7 @@ function make_dc_chain
 	# Replace the install path
 	sed "s/$dc_default_path_escape/$dc_install_path_escape_make/g" --in-place Makefile
 	# Optimise makejobs for each pc
-	sed "s/makejobs=-4/makejobs=-j$nb_cpu/g" --în-place Makefile
+	sed "s/makejobs=-4/makejobs=-j$nb_cpu/g" --in-place Makefile
 
 	make
 
