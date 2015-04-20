@@ -26,6 +26,8 @@ declare -xr DC_CHAIN_INSTALL_PATH="$MAIN_FOLDER/$DC_CHAIN_INSTALL_FOLDER_NAME/"
 declare -xr NAME_NEW_BASHRC="new_bashrc"
 declare -xr KOS_FOLDER_NAME="kos"
 declare -xr KOS_PORTS_FOLDER_NAME="kos-ports"
+
+declare -xr ENVIRON_SCRIPT_NAME="environ.sh"
 # TO MODIFY IF YOU WANT END
 
 declare -xr NEW_BASHRC="$MAIN_FOLDER/$NAME_NEW_BASHRC"
@@ -33,6 +35,7 @@ declare -xr NEW_BASHRC="$MAIN_FOLDER/$NAME_NEW_BASHRC"
 declare -xr KOS_PORTS_GIT_MODULES_FILE=".gitmodules"
 declare -xr KOS_DC_CHAIN_FOLDER_NAME="$MAIN_FOLDER/$KOS_FOLDER_NAME/utils/dc-chain"
 declare -xr DC_CHAIN_DEFAULT_PATH="/opt/toolchains/dc/"
+declare -xr ENVIRON_SAMPLE_SCRIPT_NAME="environ.sh.sample"
 
 ### OS ###
 
@@ -316,7 +319,7 @@ function download_submodules
 function download_dc_chain
 {
 	cd $KOS_DC_CHAIN_FOLDER_NAME
-	chmod 744 download.sh
+	chmod u+x download.sh
 	./download.sh --no-deps
 
 	return 0
@@ -330,7 +333,7 @@ function download_dc_chain
 function unpack_dc_chain
 {
 	cd $KOS_DC_CHAIN_FOLDER_NAME
-	chmod 744 unpack.sh
+	chmod u+x unpack.sh
 	./unpack.sh --no-deps
 
 	return 0
@@ -351,10 +354,13 @@ function make_dc_chain
 		sudo mkdir -p $DC_CHAIN_INSTALL_PATH
 	fi
 
+	# Escape all paths
 	declare -x dc_default_path_escape=$(add_escape_character_for_path $DC_CHAIN_DEFAULT_PATH)
-	declare -x dc_install_path_escape=$(add_escape_character_for_path $DC_CHAIN_INSTALL_PATH)
+	declare -x dc_install_path_escape_make=$(add_escape_character_for_path $DC_CHAIN_INSTALL_PATH)
 
-	sed "s/$dc_default_path_escape/$dc_install_path_escape/g" --in-place Makefile
+	# Replace the install path
+	sed "s/$dc_default_path_escape/$dc_install_path_escape_make/g" --in-place Makefile
+	# Optimise makejobs for each pc
 	sed "s/makejobs=-4/makejobs=-j$nb_cpu/g" --în-place Makefile
 
 	make
@@ -362,8 +368,63 @@ function make_dc_chain
 	return 0
 }
 
+### KOS AND KOS PORT ###
+
+# Make the KOS
+# USE : make_kos
+# RETURN :
+# NONE
+function make_kos
+{
+	cd $MAIN_FOLDER/$KOS_FOLDER_NAME
+
+	# Escape all paths
+	declare -x kos_path_default_escape=$(add_escape_character_for_path "$DC_CHAIN_DEFAULT_PATH"kos)
+	declare -x kos_path_escape=$(add_escape_character_for_path "$MAIN_FOLDER/$KOS_FOLDER_NAME")
+	declare -x dc_install_path_escape=$(add_escape_character_for_path $DC_CHAIN_INSTALL_PATH)
+	declare -x tmp=""
+
+	cp doc/$ENVIRON_SAMPLE_SCRIPT_NAME $ENVIRON_SCRIPT_NAME
+
+	# Modify the environment script
+	sed "s/export KOS_BASE=\"$kos_path_default_escape\"/export KOS_BASE=\"$kos_path_escape\"/g" --in-place $ENVIRON_SCRIPT_NAME
+	
+	tmp="${dc_install_path_escape}sh-elf"
+	sed "s/export KOS_CC_BASE=\"\/opt\/toolchains\/dc\/sh-elf\"/export KOS_CC_BASE=\"$tmp\"/g" --in-place $ENVIRON_SCRIPT_NAME
+
+	tmp="${dc_install_path_escape}arm-eabi"
+	sed "s/export DC_ARM_BASE=\"\/opt\/toolchains\/dc\/arm-eabi\"/export DC_ARM_BASE=\"$tmp\"/g" --in-place $ENVIRON_SCRIPT_NAME
+
+	tmp="${kos_path_escape}\/bin"
+	sed "s/export PATH=\"\${PATH}:\${KOS_CC_BASE}\/bin:\/opt\/toolchains\/dc\/bin\"/export PATH=\"\${PATH}:\${KOS_CC_BASE}\/bin:$tmp\"/g" --in-place $ENVIRON_SCRIPT_NAME
+
+	# Change right and execute script
+	chmod u+x $ENVIRON_SCRIPT_NAME
+	source $ENVIRON_SCRIPT_NAME
+
+	# Compilation
+	make -j$nb_cpu
+	# TODO : if its a root path
+}
+
+# Make the KOS Port
+# USE : make_kos_port
+# RETURN :
+# NONE
+function make_kos_port
+{
+	cd $MAIN_FOLDER/$KOS_PORTS_FOLDER_NAME
+
+	# Compilation
+	make #-j$nb_cpu
+}
+
 ### MAIN ###
 
+# Main function
+# USE : main_function
+# RETURN :
+# NONE
 function main_function
 {
 	check_os
@@ -389,7 +450,15 @@ function main_function
 
 	download_dc_chain
 	unpack_dc_chain
-	make_dc_chain	
+	make_dc_chain
+	exit_the_script
+	echo "Make Dreamcast chain"
+
+	make_kos
+	echo "Make Kos"
+
+	make_kos_port
+	echo "Make Kos port"
 }
 
 main_function
