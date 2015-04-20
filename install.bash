@@ -169,7 +169,7 @@ function check_library_package
 
 		# Check if there are an error => no lines => not installed
 		if [ $? -ne 0 ]; then
-			missing_package="$missing_package ^${PACKAGE_FOR_ARCH[$cpt_package_for_arch]}$"
+			missing_package="$missing_package ${PACKAGE_FOR_ARCH[$cpt_package_for_arch]}"
 		fi
 	done
 
