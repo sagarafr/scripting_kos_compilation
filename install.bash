@@ -7,8 +7,8 @@ declare -ix nb_cpu=`cat /proc/cpuinfo | head -13 | tail -1 | cut -d: -f2-2 | cut
 
 ### GIT ###
 
-declare -x KOS_REPO="git.code.sf.net/p/cadcdev/kallistios"
-declare -x KOS_PORTS_REPO="git.code.sf.net/p/cadcdev/kos-ports"
+declare -xr KOS_REPO="git.code.sf.net/p/cadcdev/kallistios"
+declare -xr KOS_PORTS_REPO="git.code.sf.net/p/cadcdev/kos-ports"
 declare -ix GIT_DOWNLOAD_MODE=0
 
 ### FOLDER ###
@@ -42,10 +42,16 @@ declare -xr ENVIRON_SAMPLE_SCRIPT_NAME="environ.sh.sample"
 ### OS ###
 
 declare -x OS=""
-declare -arx OS_AVAILABLE=("ARCH")
-declare -arx PACKAGE_MANAGER_SEARCH_AVAILABLE=("pacman -Q --search ARG")
-declare -arx PACKAGE_MANAGER_INSTALL_AVAILABLE=("pacman -S ARG")
+declare -arx OS_AVAILABLE=("ARCH" "Ubuntu")
+declare -arx PACKAGE_MANAGER_SEARCH_AVAILABLE=("pacman -Q --search ARG" "dpkg -L ARG")
+declare -arx PACKAGE_MANAGER_INSTALL_AVAILABLE=("pacman -S ARG" "apt-get install ARG")
 declare -arx PACKAGE_FOR_ARCH=("gcc" "git" "gawk" "patch" "bzip2" "tar" "make" "sed" "flex" "bison" "texinfo" "wget" "gettext" "elfutils" "libmpc" "mpfr" "gmp")
+declare -arx PACKAGE_FOR_UBUNTU=("libgmp-dev" "libmpfr-dev" "libmpc-dev" "gettext" "wget" "libelf-dev" "texinfo" "bison" "flex" "sed" "make" "tar" "bzip2" "patch" "gawk" "git" "gcc" "g++")
+
+### URL ###
+declare -xr NEWLIB_URL="sourceforge.net/projects/devkitpro/files/sources/newlib/newlib-2.0.0.tar.gz"
+declare -xr BINUTILS_URL="ftp.gnu.org/gnu/binutils/binutils-2.23.2.tar.bz2"
+declare -xr GCC_URL="ftp.gnu.org/gnu/gcc/gcc-5.1.0/gcc-5.1.0.tar.bz2"
 
 ### SCRIPT VALUE ###
 
@@ -153,6 +159,42 @@ function check_library_package
 			limit=`expr index "${PACKAGE_MANAGER_INSTALL_AVAILABLE[0]}" ARG`
 			# Substr PACKAGE_MANAGER_INSTALL_AVAILABLE 0 -> limit ( before ARG )
 			package_manager_install=${PACKAGE_MANAGER_INSTALL_AVAILABLE:0:$(($limit-1))}
+
+			# Check all packages
+			for((cpt_package_for_arch=0 ; cpt_package_for_arch < ${#PACKAGE_FOR_ARCH[*]} ; ++cpt_package_for_arch))
+			do
+				# Do the search
+				$package_manager_search "^${PACKAGE_FOR_ARCH[$cpt_package_for_arch]}$" &> /dev/null
+
+				# Check if there are an error => no lines => not installed
+				if [ $? -ne 0 ]; then
+					missing_package="$missing_package ${PACKAGE_FOR_ARCH[$cpt_package_for_arch]}"
+				fi
+			done
+		;;
+
+		Ubuntu)
+			# Find the position of ARG in PACKAGE_MANAGER_SEARCH_AVAILABLE
+			limit=`expr index "${PACKAGE_MANAGER_SEARCH_AVAILABLE[1]}" ARG`
+			# Substr PACKAGE_MANAGER_SEARCH_AVAILABLE 0 -> limit ( before ARG )
+			package_manager_search=${PACKAGE_MANAGER_SEARCH_AVAILABLE[1]:0:$(($limit-1))}
+
+			# Find the position of ARG in PACKAGE_MANAGER_INSTALL_AVAILABLE
+			limit=`expr index "${PACKAGE_MANAGER_INSTALL_AVAILABLE[1]}" ARG`
+			# Substr PACKAGE_MANAGER_INSTALL_AVAILABLE 0 -> limit ( before ARG )
+			package_manager_install=${PACKAGE_MANAGER_INSTALL_AVAILABLE[1]:0:$(($limit-1))}
+
+			# Check all packages
+			for((cpt_package_for_ubuntu=0 ; cpt_package_for_ubuntu < ${#PACKAGE_FOR_UBUNTU[*]} ; ++cpt_package_for_ubuntu))
+			do
+				# Do the search
+				$package_manager_search "${PACKAGE_FOR_UBUNTU[$cpt_package_for_ubuntu]}" &> /dev/null
+
+				# Check if there are an error => no lines => not installed
+				if [ $? -ne 0 ]; then
+					missing_package="$missing_package ${PACKAGE_FOR_UBUNTU[$cpt_package_for_ubuntu]}"
+				fi
+			done
 		;;
 		
 		*)
@@ -161,26 +203,14 @@ function check_library_package
 		;;
 	esac
 
-	# Check all packages
-	for((cpt_package_for_arch=0 ; cpt_package_for_arch < ${#PACKAGE_FOR_ARCH[*]} ; ++cpt_package_for_arch))
-	do
-		# Do the search
-		$package_manager_search "^${PACKAGE_FOR_ARCH[$cpt_package_for_arch]}$" &> /dev/null
-
-		# Check if there are an error => no lines => not installed
-		if [ $? -ne 0 ]; then
-			missing_package="$missing_package ${PACKAGE_FOR_ARCH[$cpt_package_for_arch]}"
-		fi
-	done
-
 	# Check the missing_package var
 	if [ "$missing_package" != "" ]; then
 		# Do the sudo command
 		echo "sudo $package_manager_install $missing_package"
 		sudo $package_manager_install $missing_package
-		
+
 		# TODO = if the user is not sudo do something
-		if [ $? -eq 0 ]; then
+		if [ $? -ne 0 ]; then
 			echo "No root password"
 			return -2
 		fi
@@ -329,9 +359,9 @@ function download_dc_chain
 
 	# ./download.sh --no-deps
 
-	wget -c sourceforge.net/projects/devkitpro/files/sources/newlib/newlib-2.0.0.tar.gz
-	wget -c ftp.gnu.org/gnu/binutils/binutils-2.23.2.tar.bz2
-	wget -c ftp.gnu.org/gnu/gcc/gcc-4.7.3/gcc-4.7.3.tar.bz2
+	wget -c $NEWLIB_URL
+	wget -c $BINUTILS_URL
+	wget -c $GCC_URL
 
 	return 0
 }
@@ -346,9 +376,6 @@ function unpack_dc_chain
 	cd $KOS_DC_CHAIN_FOLDER_NAME
 	chmod u+x unpack.sh
 	./unpack.sh --no-deps
-	# tar jxf binutils-2.23.2.tar.bz2
-	# tar jxf gcc-4.7.3.tar.bz2
-	# tar zxf newlib-2.2.0.tar.gz
 
 	return 0
 }
@@ -430,7 +457,7 @@ function make_kos_port
 	cd $MAIN_FOLDER/$KOS_PORTS_FOLDER_NAME
 
 	# Compilation
-	make #-j$nb_cpu
+	make
 }
 
 ### MAIN ###
